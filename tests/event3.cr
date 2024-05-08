@@ -4,7 +4,7 @@ MiniEvents.install
 success = true 
 
 class MyTest
-  event MyEvent, x : self
+  event MyEvent, x : MyTest
   
   # on(MyEvent) do |x|
   #   success = true
