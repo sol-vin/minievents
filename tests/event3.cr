@@ -3,17 +3,17 @@ MiniEvents.install
 
 success = true 
 
-# class MyTest
-#   event MyEvent, x : self
+class MyTest
+  event MyEvent, x : self
   
-#   on(MyEvent) do |x|
-#     success = true
-#   end
+  on(MyEvent) do |x|
+    success = true
+  end
 
-#   def test
-#     emit MyEvent, self
-#   end
-# end
+  def test
+    emit MyEvent, self
+  end
+end
 
 # MyTest.new.test
 
