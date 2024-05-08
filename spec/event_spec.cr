@@ -1,3 +1,5 @@
+require "./spec_helper"
+
 describe MiniEvents do
   it "should create an event without arguments" do
     make_event_test(1)
