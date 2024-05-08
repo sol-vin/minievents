@@ -15,7 +15,7 @@ module MiniEvents
     macro event(event_name, *args)
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
       
-      # Check if the event_name is a global path, if it is lets remove the `::{{default_events_collection}}` bit and use its full name
+      # Check if the event_name is a global path, if it is lets remove the `{{default_events_collection}}` bit and use its full name
       \{% prepended_path = "{{default_events_collection}}::" %}
       \{% if event_name.global? %}
         \{% prepended_path = "" %}
@@ -27,6 +27,7 @@ module MiniEvents
       class \{{full_name}} < {{base_event_name}}
         # Callbacks tied to this event, all of them will be called when triggered
         @@callbacks = [] of \{{full_name}}::Callback
+        @@named_callbacks = {} of String => \{{full_name}}::Callback
 
         # Types of the arguments for the event
         ARG_TYPES = {
@@ -40,9 +41,24 @@ module MiniEvents
           @@callbacks << block
         end
 
+        # Adds the block to the callbacks
+        def self.add_callback(name : String, &block : \{{full_name}}::Callback)
+          @@named_callbacks[name] = block
+        end
+
+        def self.remove_callback(name : String)
+          @@named_callbacks.delete(name)
+        end
+
         # Triggers all the callbacks
         def self.trigger(\{{args.map {|a| a.var}.splat}}) : Nil
           @@callbacks.each(&.call(\{{args.map {|a| a.var}.splat}}))
+          @@named_callbacks.values.each(&.call(\{{args.map {|a| a.var}.splat}}))
+        end
+
+        def self.clear_callbacks
+          @@callbacks.clear
+          @@named_callbacks.clear
         end
       end
 
@@ -61,9 +77,23 @@ module MiniEvents
       
       \{% if args = parse_type("#{full_name}::ARG_TYPES").resolve? %}
         @%callbacks_\{{event_name.id.underscore}} = [] of \{{full_name}}::Callback
+        @%named_callbacks_\{{event_name.id.underscore}} = {} of String => \{{full_name}}::Callback
 
         def on_\{{full_name.names.last.underscore}}(&block : \{{full_name}}::Callback)
           @%callbacks_\{{event_name.id.underscore}} << block
+        end
+
+        def on_\{{full_name.names.last.underscore}}(name : String, &block : \{{full_name}}::Callback)
+          @%named_callbacks_\{{event_name.id.underscore}}[name] = block
+        end
+
+        def delete_\{{full_name.names.last.underscore}}(name : String)
+          @%named_callbacks_\{{event_name.id.underscore}}.delete(name)
+        end
+
+        def clear_\{{full_name.names.last.underscore}}()
+          @%callbacks_\{{event_name.id.underscore}}.clear
+          @%named_callbacks_\{{event_name.id.underscore}}.clear
         end
 
         \{% arg_types = [] of MacroId%}
@@ -89,9 +119,31 @@ module MiniEvents
       \{% full_name = "#{prepended_path.id}#{event_name.id}".id %}
 
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
-      raise "Incorrect arguments for block" unless \{{block.args.size}} == \{{full_name}}::ARG_TYPES.size
 
+      \{% if args = parse_type("#{full_name}::ARG_TYPES").resolve? %}
+        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
+      \{% end %}
       \{{full_name}}.add_callback do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+        \{{ block.body }}
+        nil
+      end
+    end
+
+    # Defines a global event named callback
+    macro on(name, event_name, &block)
+      \{% prepended_path = "{{default_events_collection}}::" %}
+      \{% if event_name.global? %}
+        \{% prepended_path = "" %}
+      \{% end %}
+      \{% full_name = "#{prepended_path.id}#{event_name.id}".id %}
+
+      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
+
+      \{% if args = parse_type("#{full_name}::ARG_TYPES").resolve? %}
+        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
+      \{% end %}
+      \{% raise "name cannot be empty" if name.empty? %}
+      \{{full_name}}.add_callback(\{{name}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
         \{{ block.body }}
         nil
       end

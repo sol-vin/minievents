@@ -10,12 +10,17 @@ class MyClass
   attach MyEvent1
   attach MyEvent2
   attach MyEvent3
+
+  def initialize
+    # You can set an event call back in the initialize method
+    on_my_event2 { |x| raise FAILURE if x != "Hi"}
+  end
 end
 
 m = MyClass.new
 
+# Or out here on the object itself
 m.on_my_event1 { |x| my_event1_runs += x }
-m.on_my_event2 { |x| }
 m.on_my_event3 { |x| }
 
 m.emit_my_event1(1)
