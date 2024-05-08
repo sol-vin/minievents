@@ -120,17 +120,60 @@ require "minievents"
 MiniEvents.install(MyClass::Event, MyClass::Events)
 ```
 
-You can also install multiple instances of MiniEvents into a single program, as long as it is installed under a namespace. 
+You can also install multiple instances of MiniEvents into a single program, but they will all be link so the systems will be linked.
 
 ```crystal
 require "minievents"
+
+
 module A
-  MiniEvents.install(MyClass::Event, MyClass::Events)
+  MiniEvents.install(Event)
+
+  event MyEvent, x : Int32
+
+  on(MyEvent) do |x|
+    puts "A"
+  end
+
+  def self.trigger
+    emit MyEvent, 10
+  end
 end
 
+
 module B
-  MiniEvents.install(MyClass::Event, MyClass::Events)
+  MiniEvents.install(Event)
+  
+  event MyEvent, x : Int32
+  
+  on(MyEvent) do |x|
+    puts "B"
+  end
+  
+  def self.trigger
+    emit MyEvent, 20
+  end
 end
+
+A.trigger
+B.trigger
+
+A.emit ::A::MyEvent, 30
+B.emit ::B::MyEvent , 40
+
+# Systems are coupled so you can still do this
+A.emit ::B::MyEvent, 50
+B.emit ::A::MyEvent , 60
+```
+
+#### Output
+```
+A
+B
+A
+B
+B
+A
 ```
 
 ## Development

@@ -1,4 +1,5 @@
-require "../spec/spec_helper"
+require "./test"
+MiniEvents.install
 
 my_event1_runs = 0
 

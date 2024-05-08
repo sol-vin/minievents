@@ -1,4 +1,6 @@
-require "../spec/spec_helper"
+require "./test"
+MiniEvents.install
+
 success = false 
 
 class MyTest
