@@ -1,4 +1,5 @@
 module MiniEvents
+  # Not sure how else to do this
   {% for x in [0,1] %}
     {% if x == 0 %}
   macro install()
