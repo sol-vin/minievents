@@ -92,6 +92,8 @@ module MiniEvents
         def emit_\\{{event_name.names.last.underscore}}(\\{{arg_types.splat}})
           # Call object specific callbacks
           @%callbacks_\\{{event_name.id.underscore}}.each(&.call(\\{{args.keys.map {|a| a.id }.splat}}))
+          @%named_callbacks_\\{{event_name.id.underscore}}.values.each(&.call(\\{{args.keys.map {|a| a.id }.splat}}))
+
           # Call event callbacks 
           \\{{event_name}}.trigger(\\{{args.keys.map {|a| a.id }.splat}})
         end
@@ -139,6 +141,8 @@ module MiniEvents
         def emit_\\{{event_name.names.last.underscore}}(\\{{arg_types[1..].splat}})
           # Call object specific callbacks
           @%callbacks_\\{{event_name.id.underscore}}.each(&.call(self \\{% if args.size > 1 %},\\{% end %} \\{{args.keys[1..].map {|a| a.id }.splat}}))
+          @%named_callbacks_\\{{event_name.id.underscore}}.values.each(&.call(self \\{% if args.size > 1 %},\\{% end %} \\{{args.keys[1..].map {|a| a.id }.splat}}))
+          
           # Call event callbacks 
           \\{{event_name}}.trigger(self, \\{{args.keys[1..].map {|a| a.id }.splat}})
         end
