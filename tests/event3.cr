@@ -5,17 +5,15 @@ success = true
 
 class MyTest
   event MyEvent, x : self
-  
-  # on(MyEvent) do |x|
-  #   success = true
-  # end
 
-  # def test
-  #   emit MyEvent, self
-  # end
+  attach_self MyEvent
+
+  def test
+    emit_my_event
+  end
 end
 
-# MyTest.new.test
+MyTest.new.test
 
 if success
   puts SUCCESS

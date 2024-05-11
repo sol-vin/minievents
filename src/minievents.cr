@@ -100,6 +100,43 @@ module MiniEvents
       \\{% end %}
     end
 
+    # Includes an event to the classes instances but replaces the first argument with self
+    macro attach_self(event_name)   
+      \\{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        @%callbacks_\\{{event_name.id.underscore}} = [] of \\{{event_name}}::Callback
+        @%named_callbacks_\\{{event_name.id.underscore}} = {} of String => \\{{event_name}}::Callback
+
+        def on_\\{{event_name.names.last.underscore}}(&block : \\{{event_name}}::Callback)
+          @%callbacks_\\{{event_name.id.underscore}} << block
+        end
+
+        def on_\\{{event_name.names.last.underscore}}(name : String, &block : \\{{event_name}}::Callback)
+          @%named_callbacks_\\{{event_name.id.underscore}}[name] = block
+        end
+
+        def delete_\\{{event_name.names.last.underscore}}(name : String)
+          @%named_callbacks_\\{{event_name.id.underscore}}.delete(name)
+        end
+
+        def clear_\\{{event_name.names.last.underscore}}()
+          @%callbacks_\\{{event_name.id.underscore}}.clear
+          @%named_callbacks_\\{{event_name.id.underscore}}.clear
+        end
+
+        \\{% arg_types = [] of MacroId%}
+        \\{% args.each { |k,v| arg_types << "#{k.id} : #{v}".id }%}
+
+        def emit_\\{{event_name.names.last.underscore}}(\\{{arg_types[1..].splat}})
+          # Call object specific callbacks
+          @%callbacks_\\{{event_name.id.underscore}}.each(&.call(self, \\{{args.keys[1..].map {|a| a.id }.splat}}))
+          # Call event callbacks 
+          \\{{event_name}}.trigger(self, \\{{args.keys[1..].map {|a| a.id }.splat}})
+        end
+      \\{% else %}
+        \\{% raise "Path was unable to be resolved!" %}
+      \\{% end %}
+    end
+
     # Defines a global event callback
     macro on(event_name, &block)
       \\{% raise "event_name should be a Path" unless event_name.is_a? Path %}
