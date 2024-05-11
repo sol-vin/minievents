@@ -101,17 +101,28 @@ module MiniEvents
     end
 
     # Includes an event to the classes instances but replaces the first argument with self
-    macro attach_self(event_name)   
+    macro attach_self(event_name)  
+
       \\{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        \\{% raise "Cannot attach to self with zero arguments!" if args.size == 0 %}
+        \\{% raise "Self must be the first argument!" unless args.values[0].id == @type.id %}
+        alias \\{{event_name}}::SelfCallback = Proc(\\{{(args.size > 1) ? (args.values[1..].map {|arg| (arg.type.is_a? Self) ? @type : arg.type }).splat : "".id}}\\{% if args.size > 1 %}, \\{% end %}Nil)
+
         @%callbacks_\\{{event_name.id.underscore}} = [] of \\{{event_name}}::Callback
         @%named_callbacks_\\{{event_name.id.underscore}} = {} of String => \\{{event_name}}::Callback
 
-        def on_\\{{event_name.names.last.underscore}}(&block : \\{{event_name}}::Callback)
-          @%callbacks_\\{{event_name.id.underscore}} << block
+        def on_\\{{event_name.names.last.underscore}}(&block : \\{{event_name}}::SelfCallback)
+          wrapped_block = \\{{event_name}}::Callback.new do |_, \\{{args.keys[1..].splat}}|
+            block.call(self, \\{{args.keys[1..].splat}})
+          end
+          @%callbacks_\\{{event_name.id.underscore}} << wrapped_block
         end
 
-        def on_\\{{event_name.names.last.underscore}}(name : String, &block : \\{{event_name}}::Callback)
-          @%named_callbacks_\\{{event_name.id.underscore}}[name] = block
+        def on_\\{{event_name.names.last.underscore}}(name : String, &block : \\{{event_name}}::SelfCallback)
+          wrapped_block = \\{{event_name}}::Callback.new do |_, \\{{args.keys[1..].splat}}|
+            block.call(self, \\{{args.keys[1..].splat}})
+          end
+          @%named_callbacks_\\{{event_name.id.underscore}}[name] = wrapped_block
         end
 
         def delete_\\{{event_name.names.last.underscore}}(name : String)
