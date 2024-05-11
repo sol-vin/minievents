@@ -102,7 +102,6 @@ module MiniEvents
 
     # Includes an event to the classes instances but replaces the first argument with self
     macro attach_self(event_name)  
-
       \\{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
         \\{% raise "Cannot attach to self with zero arguments!" if args.size == 0 %}
         \\{% raise "Self must be the first argument!" unless args.values[0].id == @type.id %}
@@ -112,15 +111,15 @@ module MiniEvents
         @%named_callbacks_\\{{event_name.id.underscore}} = {} of String => \\{{event_name}}::Callback
 
         def on_\\{{event_name.names.last.underscore}}(&block : \\{{event_name}}::SelfCallback)
-          wrapped_block = \\{{event_name}}::Callback.new do |_, \\{{args.keys[1..].splat}}|
-            block.call(self, \\{{args.keys[1..].splat}})
+          wrapped_block = \\{{event_name}}::Callback.new do |_\\{% if args.size > 1 %},\\{% end %} \\{{args.keys[1..].splat}}|
+            block.call(\\{{args.keys[1..].splat}})
           end
           @%callbacks_\\{{event_name.id.underscore}} << wrapped_block
         end
 
         def on_\\{{event_name.names.last.underscore}}(name : String, &block : \\{{event_name}}::SelfCallback)
-          wrapped_block = \\{{event_name}}::Callback.new do |_, \\{{args.keys[1..].splat}}|
-            block.call(self, \\{{args.keys[1..].splat}})
+          wrapped_block = \\{{event_name}}::Callback.new do |_\\{% if args.size > 1 %},\\{% end %} \\{{args.keys[1..].splat}}|
+            block.call(\\{{args.keys[1..].splat}})
           end
           @%named_callbacks_\\{{event_name.id.underscore}}[name] = wrapped_block
         end
@@ -139,7 +138,7 @@ module MiniEvents
 
         def emit_\\{{event_name.names.last.underscore}}(\\{{arg_types[1..].splat}})
           # Call object specific callbacks
-          @%callbacks_\\{{event_name.id.underscore}}.each(&.call(self, \\{{args.keys[1..].map {|a| a.id }.splat}}))
+          @%callbacks_\\{{event_name.id.underscore}}.each(&.call(self \\{% if args.size > 1 %},\\{% end %} \\{{args.keys[1..].map {|a| a.id }.splat}}))
           # Call event callbacks 
           \\{{event_name}}.trigger(self, \\{{args.keys[1..].map {|a| a.id }.splat}})
         end

@@ -1,7 +1,7 @@
 require "./test"
 MiniEvents.install
 
-success = true 
+success = false 
 
 class MyTest
   event MyEvent, x : self
@@ -13,7 +13,11 @@ class MyTest
   end
 end
 
-MyTest.new.test
+t = MyTest.new
+t.on_my_event do
+  success = true
+end
+t.test
 
 if success
   puts SUCCESS
