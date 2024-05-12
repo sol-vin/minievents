@@ -1,25 +1,24 @@
 require "./test"
 MiniEvents.install
 
-my_event1_runs = 0
+success = false 
 
-event MyEvent1
+class MyTest
+  attach_event MyEvent, x : self, y : Int32
 
-class MyClass
-  attach MyEvent1
+  def test
+    emit MyEvent, self, 10
+  end
 end
 
-m = MyClass.new
+t = MyTest.new
+t.on_my_event do |x|
+  success = true if x == 10
+end
+t.test
 
-m.on_my_event1 { my_event1_runs += 1 }
-
-m.emit_my_event1
-m.emit_my_event1
-m.emit_my_event1
-
-
-if my_event1_runs == 3
+if success
   puts SUCCESS
 else
-  puts FAILURE 
+  puts FAILURE
 end

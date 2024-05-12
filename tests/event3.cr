@@ -4,12 +4,10 @@ MiniEvents.install
 success = false 
 
 class MyTest
-  event MyEvent, x : self
-
-  attach_self MyEvent
+  attach_event MyEvent, x : self
 
   def test
-    emit_my_event
+    emit MyEvent, self
   end
 end
 

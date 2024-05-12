@@ -20,8 +20,4 @@ describe MiniEvents do
   it "should use attach" do
     make_event_test(5)
   end
-
-  it "should use inner name spaces when used inside a class" do
-    make_event_test(6)
-  end
 end
