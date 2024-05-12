@@ -9,51 +9,25 @@ module MiniEvents
       end
     end
 
-    {% for i in [0, 1] %}
-      {% attach_name = (i == 0) ? "".id : "attach_".id %}
-      # Creates a new event
-      macro {{attach_name}}event(event_name, *args)
-        \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
-        # Create our event class
-        class \{{event_name}} < {{base_event_name}}
+    # Creates a new event, attempts to bind itself to instances of a class if it's first argument is a self
+    macro event(event_name, *args)
+      _event(\{{event_name}}, \{{args.splat}})
 
-          # Callbacks tied to this event, all of them will be called when triggered
-          @@callbacks = [] of \{{event_name}}::Callback
+      \{% if args.size > 0 && args[0].type.is_a?(Self) %}
+        _attach_self(\{{event_name}})
+      \{% end %}
+    end
 
-          # Types of the arguments for the event
-          ARG_TYPES = {
-            \{% for arg in args %}
-              \{{arg.var.stringify}} => \{{(arg.type.is_a? Self) ? @type : arg.type}},
-            \{% end %}
-          } of String => Object.class
+    # Creates a new event
+    macro _event(event_name, *args)
+      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
 
-          # Adds the block to the callbacks
-          def self.add_callback(&block : \{{event_name}}::CallbackProc)
-            @@callbacks << \{{event_name}}::Callback.new(&block)
-          end
-
-          # Adds the block to the callbacks
-          def self.add_callback(name : String, &block : \{{event_name}}::CallbackProc)
-            @@callbacks << \{{event_name}}::Callback.new(name, &block)
-          end
-
-          def self.remove_callback(name : String)
-            @@callbacks.reject!(&.name.==(name))
-          end
-
-          # Triggers all the callbacks
-          def self.trigger(\{{args.map {|a| a.var}.splat}}) : Nil
-            @@callbacks.each(&.call(\{{args.map {|a| a.var}.splat}}))
-          end
-
-          def self.clear_callbacks
-            @@callbacks.clear
-          end
-        end
-
+      # Create our event class
+      class \{{event_name}} < {{base_event_name}}
         # Alias for the callback.
-        alias \{{event_name}}::CallbackProc = Proc(\{{(args.map {|arg| (arg.type.is_a? Self) ? @type : arg.type }).splat}}\{% if args.size > 0 %}, \{% end %}Nil)
-        struct \{{event_name}}::Callback
+        alias CallbackProc = Proc(\{{(args.map {|arg| (arg.type.is_a? Self) ? @type : arg.type }).splat}}\{% if args.size > 0 %}, \{% end %}Nil)
+        
+        struct Callback
           getter name : String = ""
           getter proc : CallbackProc
           getter? once = false
@@ -72,11 +46,41 @@ module MiniEvents
             proc.call(\{{args.map {|a| a.var}.splat}})
           end
         end
-        {% if i == 1 %}
-          _attach_self(\{{event_name}})
-        {% end %}
+
+        # Callbacks tied to this event, all of them will be called when triggered
+        @@callbacks = [] of Callback
+
+        # Types of the arguments for the event
+        ARG_TYPES = {
+          \{% for arg in args %}
+            \{{arg.var.stringify}} => \{{(arg.type.is_a? Self) ? @type : arg.type}},
+          \{% end %}
+        } of String => Object.class
+
+        # Adds the block to the callbacks
+        def self.add_callback(&block : CallbackProc)
+          @@callbacks << Callback.new(&block)
+        end
+
+        # Adds the block to the callbacks
+        def self.add_callback(name : String, &block : CallbackProc)
+          @@callbacks << \{{event_name}}::Callback.new(name, &block)
+        end
+
+        def self.remove_callback(name : String)
+          @@callbacks.reject!(&.name.==(name))
+        end
+
+        # Triggers all the callbacks
+        def self.trigger(\{{args.map {|a| a.var}.splat}}) : Nil
+          @@callbacks.each(&.call(\{{args.map {|a| a.var}.splat}}))
+        end
+
+        def self.clear_callbacks
+          @@callbacks.clear
+        end
       end
-    {% end %}
+    end
 
     # Defines a global event callback
     macro on(event_name, &block)
@@ -115,7 +119,7 @@ module MiniEvents
         class \{{event_name}} < {{base_event_name}}
           # Triggers all the callbacks
           def self.trigger(\{{args.keys.map(&.id).splat}}) : Nil
-            \{{args.keys[0].id}}.emit_\{{event_name.names.last.underscore}}(\{{args.keys[1..].map(&.id).splat}})
+            \{{args.keys[0].id}}.run_\{{event_name.names.last.underscore}}(\{{args.keys[1..].map(&.id).splat}})
 
             @@callbacks.each(&.call(\{{args.keys.map(&.id).splat}}))
           end
@@ -154,7 +158,7 @@ module MiniEvents
         \{% arg_types = [] of MacroId%}
         \{% args.each { |k,v| arg_types << "#{k.id} : #{v}".id }%}
 
-        def emit_\{{event_name.names.last.underscore}}(\{{arg_types[1..].splat}})
+        def run_\{{event_name.names.last.underscore}}(\{{arg_types[1..].splat}})
           @%callbacks_\{{event_name.id.underscore}}.each(&.call(self\{% if args.size > 1 %},\{% end %}\{{args.keys[1..].map {|a| a.id }.splat}}))
         end
       \{% end %}
