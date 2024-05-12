@@ -110,7 +110,7 @@ module MiniEvents
       \{{event_name}}.trigger(\{{args.splat}})
     end
 
-    private macro _attach_self(event_name)
+    macro _attach_self(event_name)
       \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
         class \{{event_name}} < {{base_event_name}}
           # Triggers all the callbacks
