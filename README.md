@@ -23,6 +23,9 @@ Minievents can be used in both a "global" mode and an "instance" mode.
 
 ### Basic global usage:
 ```crystal
+require "minievents"
+MiniEvents.install
+
 # Create an event
 event Event1
 
@@ -58,66 +61,90 @@ Event2: Triggered at 100, 200!
 
 ### Basic instance usage:
 ```crystal
+require "minievents"
+MiniEvents.install
 
-# Event can be made out here
-event LeverOn
 class Lever
-  # Or in here (it doesn't matter)
-  event LeverOff
-
-  # Attach our events to this class
-  attach LeverOn
-  attach LeverOff
+  # Event can be made here
+  # This adds on_event(on_off in this case)
+  event Off, me : self
 
   @state = false
 
   def toggle
     if @state == true
-      emit_lever_off # Created by `attach Off`
+      emit Off, self
       @state = false
     else
-      emit_lever_on # Created by `attach On`
+      emit On, self
       @state = true
     end
   end
 end
+# Or out here (however this does not hook up on_event methods unless made in the class)
+event Lever::On, me : Lever
 
-lever = Lever.new
+lever1 = Lever.new
+lever2 = Lever.new
 
-lever.on_lever_on do
+# # Cant hook this because it was made outside 
+# lever.on_on do
+#   puts "ON!"
+# end
+
+on(Lever::On) do |lever|
   puts "ON!"
 end
 
-lever.on_lever_off do
-  puts "off"
+# This is localized to this instance only
+lever1.on_off do
+  puts "~off~"
 end
 
-lever.toggle
-lever.toggle
-lever.toggle
-lever.toggle
-lever.toggle
+on(Lever::Off) do |lever|
+  puts "~also off~"
+end
+
+lever1.toggle
+lever1.toggle
+lever1.toggle
+lever1.toggle
+lever1.toggle
+puts
+lever2.toggle
+lever2.toggle
+lever2.toggle
+lever2.toggle
+lever2.toggle
 ```
 
 #### Output
 ```
 ON!
-off
+~off~
+~also off~
 ON!
-off
+~off~
+~also off~
+ON!
+
+ON!
+~also off~
+ON!
+~also off~
 ON!
 ```
 
 ### Default Names
 
-By default the base event is called `MiniEvents::Event` and all of these events are collected under the namespace `MiniEvents::Events`
+By default the base event is called `::MiniEvents::Event`
 
 ### Advanced Configuration
-You can change what the default event name and event collection is named when using `MiniEvents.install`.
+You can change what the default event name is named when using `::MiniEvents.install`.
 
 ```crystal
 require "minievents"
-MiniEvents.install(MyClass::Event, MyClass::Events)
+MiniEvents.install(::MyClass::Event)
 ```
 
 You can also install multiple instances of MiniEvents into a single program, but they will all be link so the systems will be linked.
@@ -142,7 +169,7 @@ end
 
 
 module B
-  MiniEvents.install(Event)
+  MiniEvents.install(Event) # Installs event to B::Event
   
   event MyEvent, x : Int32
   
@@ -155,9 +182,11 @@ module B
   end
 end
 
+# Emit in here
 A.trigger
 B.trigger
 
+# Or emit out here
 A.emit ::A::MyEvent, 30
 B.emit ::B::MyEvent , 40
 
@@ -176,6 +205,46 @@ B
 A
 ```
 
+# Usage per instance
+
+Classes can be made to allow their instances to have custom callbacks. This happens automatically when the event is created inside of a class and takes its first argument as it's own type.
+
+```crystal
+require "minievents"
+MiniEvents.install
+
+class MyClass
+  event MyEvent
+  event MySelfEvent, me : self
+  event MySelfEvent2, me : self, x : Int32
+end
+
+m = MyClass.new
+
+# Can't  do this because MyEvent doesn't take a self param
+# m.on_my_event do
+#   puts "MySelfEvent"
+# end
+
+m.on_my_self_event do # Doesn't take the me argument here
+  puts "MySelfEvent"
+end
+
+m.on_my_self_event2 do |x| # Doesn't take the me argument here
+  puts "MySelfEvent2 #{x}"
+end
+
+emit MyClass::MyEvent
+emit MyClass::MySelfEvent, m # You include the object emitted here
+emit MyClass::MySelfEvent2, m, 500 # You include the object emitted here
+```
+
+#### Output
+```
+MySelfEvent
+MySelfEvent2 500
+```
+
 ## Development
 
 Fork it or whatever IDC
@@ -190,4 +259,4 @@ Fork it or whatever IDC
 
 ## Contributors
 
-- [Ian Rash](https://github.com/your-github-user) - creator and maintainer
+- [Ian Rash](https://github.com/sol-vin) - creator and maintainer
