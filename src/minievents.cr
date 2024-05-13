@@ -98,54 +98,27 @@ module MiniEvents
     end
 
     # Defines a global event callback
-    macro on(event_name, &block)
+    macro on(event_name, once = false, &block)
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
 
       \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
         \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
       \{% end %}
-      \{{event_name}}.add_callback do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+      \{{event_name}}.add_callback(once: \{{once}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
         \{{ block.body }}
         nil
       end
     end
 
     # Defines a global event named callback
-    macro on(event_name, name, &block)
+    macro on(event_name, name, once = false, &block)
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
 
       \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
         \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
       \{% end %}
       \{% raise "name cannot be empty" if name.empty? %}
-      \{{event_name}}.add_callback(\{{name}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
-        \{{ block.body }}
-        nil
-      end
-    end
-
-    # Defines a global event callback
-    macro once(event_name, &block)
-      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
-
-      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
-        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
-      \{% end %}
-      \{{event_name}}.add_callback(once: true) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
-        \{{ block.body }}
-        nil
-      end
-    end
-
-    # Defines a global event named callback
-    macro once(event_name, name, &block)
-      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
-
-      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
-        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
-      \{% end %}
-      \{% raise "name cannot be empty" if name.empty? %}
-      \{{event_name}}.add_callback(\{{name}}, once: true) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+      \{{event_name}}.add_callback(\{{name}}, once: \{{once}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
         \{{ block.body }}
         nil
       end
