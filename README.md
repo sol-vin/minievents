@@ -245,13 +245,39 @@ MySelfEvent
 MySelfEvent2 500
 ```
 
+If you make an event outside of it's containing class it cannot hook up the `#on_event`, maybe there is a way to fix that in the future IDK.
+
+# Usage on `struct`s
+Structs cannot use normal `event` because it has an array.
+
+However, it can use the mono-callback class `single_event`. Single events work just like regular events but only have one callback.
+
+Use this just like you would `event`, just without the ability to use multiple callbacks. It will also attempt to attach to a single instance if the first argument is a `self`.
+
+```crystal
+struct MyStruct
+  single_event MyEvent
+  single_event MySelfEvent
+  single_event MySelfEvent2, i : self
+end
+
+emit MyStruct::MyEvent
+emit MyStruct::MySelfEvent
+
+s = MyStruct.new
+s.on_my_self_event2 do 
+  puts s
+end
+
+emit MyStruct::MySelfEvent2, s
+```
 ## Development
 
 Fork it or whatever IDC
 
 ## Contributing
 
-1. Fork it (<https://github.com/your-github-user/minievents/fork>)
+1. Fork it (<https://github.com/sol-vin/minievents/fork>)
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
