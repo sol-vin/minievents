@@ -1,24 +1,22 @@
 require "./test"
 MiniEvents.install
 
-success = false 
+total = 0
 
 class MyTest
-  event MyEvent, x : self, y : Int32
-
-  def test
-    emit MyEvent, self, 10
-  end
+  event MyEvent, x : self
 end
 
 t = MyTest.new
-t.on_my_event do |x|
-  success = true if x == 10
+t.on_my_event(once: true) do
+  total += 1
 end
-t.test
 
-if success
+emit MyTest::MyEvent, t
+emit MyTest::MyEvent, t
+
+if total == 1
   puts SUCCESS
 else
-  puts FAILURE
+  puts FAILURE, total
 end

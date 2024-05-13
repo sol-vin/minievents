@@ -37,13 +37,7 @@ module MiniEvents
           # Should we only run this once?
           getter? once = false
 
-          def initialize(name : String? = nil, @once = false, &block : CallbackProc)
-            if n = name
-              @name = n 
-            else
-              @name = UUID.random.to_s
-            end
-            
+          def initialize(name : String, @once = false, &block : CallbackProc)            
             @proc = CallbackProc.new &block
           end
 
@@ -64,13 +58,26 @@ module MiniEvents
         } of String => Object.class
 
         # Adds the block to the callbacks
-        def self.add_callback(&block : CallbackProc)
-          @@callbacks << Callback.new(&block)
+        def self.add_callback(once = false, &block : CallbackProc)
+          name = UUID.random.to_s
+          @@callbacks << Callback.new(name, once) do \{% if args.size > 0 %}|\{{args.map { |a| a.var }.splat}}|\{% end %}
+            block.call(\{{args.map { |a| a.var }.splat}})
+
+            if once
+              remove_callback name
+            end
+          end
         end
 
         # Adds the named block to the callbacks
-        def self.add_callback(name : String, &block : CallbackProc)
-          @@callbacks << \{{event_name}}::Callback.new(name, &block)
+        def self.add_callback(name : String, once = false, &block : CallbackProc)
+          @@callbacks << \{{event_name}}::Callback.new(name, once) do \{% if args.size > 0 %}|\{{args.map { |a| a.var }.splat}}|\{% end %}
+            block.call(\{{args.map { |a| a.var }.splat}})
+
+            if once
+              remove_callback name
+            end
+          end
         end
 
         # Removes a named block
@@ -117,6 +124,33 @@ module MiniEvents
       end
     end
 
+    # Defines a global event callback
+    macro once(event_name, &block)
+      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
+
+      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
+      \{% end %}
+      \{{event_name}}.add_callback(once: true) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+        \{{ block.body }}
+        nil
+      end
+    end
+
+    # Defines a global event named callback
+    macro once(event_name, name, &block)
+      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
+
+      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
+      \{% end %}
+      \{% raise "name cannot be empty" if name.empty? %}
+      \{{event_name}}.add_callback(\{{name}}, once: true) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+        \{{ block.body }}
+        nil
+      end
+    end
+
     # Emits a global event callback
     macro emit(event_name, *args)
       \{{event_name}}.trigger(\{{args.splat}})
@@ -140,20 +174,14 @@ module MiniEvents
 
         struct \{{event_name}}::SelfCallback
           # name of the proc
-          getter name : String = ""
+          getter name : String
           # THe proc itself
           getter proc : SelfCallbackProc
           # TODO: Use this
           # Should we only run this once?
           getter? once = false
 
-          def initialize(name : String? = nil, @once = false, &block : SelfCallbackProc)
-            if n = name
-              @name = n 
-            else
-              @name = UUID.random.to_s
-            end
-            
+          def initialize(@name : String, @once = false, &block : SelfCallbackProc)
             @proc = block
           end
           
@@ -166,16 +194,29 @@ module MiniEvents
 
         @%callbacks_\{{event_name.id.underscore}} = [] of \{{event_name}}::SelfCallback
 
-        def on_\{{event_name.names.last.underscore}}(&block : \{{event_name}}::SelfCallbackProc)
-          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::SelfCallback.new(&block)
+        def on_\{{event_name.names.last.underscore}}(once = false, &block : \{{event_name}}::SelfCallbackProc)
+          name = UUID.random.to_s
+          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::SelfCallback.new(name, once: once) do \{% if args.size > 1 %}|\{{args.keys[1..].map { |a| a.id }.splat}}|\{% end %}
+            block.call(\{{args.keys[1..].map { |a| a.id }.splat}})
+
+            if once
+              remove_\{{event_name.names.last.underscore}} name
+            end
+          end
         end
 
-        def on_\{{event_name.names.last.underscore}}(name : String, &block : \{{event_name}}::SelfCallbackProc)
-          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::SelfCallback.new(name, &block)
+        def on_\{{event_name.names.last.underscore}}(name : String, once = false, &block : \{{event_name}}::SelfCallbackProc)
+          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::SelfCallback.new(name, once: once) do \{% if args.size > 1 %}|\{{args.keys[1..].map { |a| a.id }.splat}}|\{% end %}
+            block.call(\{{args.keys[1..].map { |a| a.id }.splat}})
+
+            if once
+              remove_\{{event_name.names.last.underscore}} name
+            end
+          end
         end
 
-        def delete_\{{event_name.names.last.underscore}}(name : String)
-          @%callbacks_\{{event_name.id.underscore}}.reject!(&.name.==(name))
+        def remove_\{{event_name.names.last.underscore}}(name : String)
+          @%callbacks_\{{event_name.id.underscore}}.reject! {|cb| cb.name == name}
         end
 
         def clear_\{{event_name.names.last.underscore}}()
