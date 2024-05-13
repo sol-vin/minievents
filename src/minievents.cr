@@ -134,34 +134,33 @@ module MiniEvents
       #TODO: Do check to make sure @type isnt a struct
       \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
         class \{{event_name}} < {{base_event_name}}
+          alias SelfCallbackProc = Proc(\{% if args.size > 1 %}\{{args.values[1..].splat}}, \{% end %}Nil)
+
+          struct SelfCallback
+            # name of the proc
+            getter name : String
+            # THe proc itself
+            getter proc : SelfCallbackProc
+            # TODO: Use this
+            # Should we only run this once?
+            getter? once = false
+
+            def initialize(@name : String, @once = false, &block : SelfCallbackProc)
+              @proc = block
+            end
+            
+
+            # Calls our proc with the arguments
+            def call(\{{args.keys[1..].map {|a| a.id}.splat}})
+              @proc.call(\{{args.keys[1..].map {|a| a.id}.splat}})
+            end
+          end
+
           # Triggers all the callbacks
           def self.trigger(\{{args.keys.map(&.id).splat}}) : Nil
             \{{args.keys[0].id}}.run_\{{event_name.names.last.underscore}}(\{{args.keys[1..].map(&.id).splat}})
 
             @@callbacks.each(&.call(\{{args.keys.map(&.id).splat}}))
-          end
-        end
-
-
-        alias \{{event_name}}::SelfCallbackProc = Proc(\{% if args.size > 1 %}\{{args.values[1..].splat}}, \{% end %}Nil)
-
-        struct \{{event_name}}::SelfCallback
-          # name of the proc
-          getter name : String
-          # THe proc itself
-          getter proc : SelfCallbackProc
-          # TODO: Use this
-          # Should we only run this once?
-          getter? once = false
-
-          def initialize(@name : String, @once = false, &block : SelfCallbackProc)
-            @proc = block
-          end
-          
-
-          # Calls our proc with the arguments
-          def call(\{{args.keys[1..].map {|a| a.id}.splat}})
-            @proc.call(\{{args.keys[1..].map {|a| a.id}.splat}})
           end
         end
 
