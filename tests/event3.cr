@@ -5,10 +5,6 @@ success1 = false
 sucess2 = false
 class MyTest
   event MyEvent, x : self
-
-  def test
-    emit MyEvent, self
-  end
 end
 
 t = MyTest.new
@@ -19,7 +15,8 @@ end
 on(MyTest::MyEvent) do |test|
   success2 = true
 end
-t.test
+
+emit MyTest::MyEvent, t
 
 class MyTest2
   event MyEvent, x : self, i : Int32
@@ -52,6 +49,14 @@ test3.on_my_event do
   success3 = true
 end
 test3.test
+
+struct MyTest4
+  single_event MyEvent, x : self
+end
+
+test4 = MyTest4.new
+emit MyTest4::MyEvent, test4
+
 
 if success1 && success2 && success3
   puts SUCCESS
