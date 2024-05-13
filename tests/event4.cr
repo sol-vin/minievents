@@ -4,7 +4,7 @@ MiniEvents.install
 success = false 
 
 class MyTest
-  attach_event MyEvent, x : self, y : Int32
+  event MyEvent, x : self, y : Int32
 
   def test
     emit MyEvent, self, 10

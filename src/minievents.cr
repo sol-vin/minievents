@@ -27,9 +27,14 @@ module MiniEvents
         # Alias for the callback.
         alias CallbackProc = Proc(\{{(args.map {|arg| (arg.type.is_a? Self) ? @type : arg.type }).splat}}\{% if args.size > 0 %}, \{% end %}Nil)
         
+        # Holds the callback information
         struct Callback
+          # name of the proc
           getter name : String = ""
+          # THe proc itself
           getter proc : CallbackProc
+          # TODO: Use this
+          # Should we only run this once?
           getter? once = false
 
           def initialize(name : String? = nil, @once = false, &block : CallbackProc)
@@ -42,15 +47,16 @@ module MiniEvents
             @proc = CallbackProc.new &block
           end
 
+          # Calls our proc with the arguments
           def call(\{{args.map {|a| a.var}.splat}})
-            proc.call(\{{args.map {|a| a.var}.splat}})
+            @proc.call(\{{args.map {|a| a.var}.splat}})
           end
         end
 
         # Callbacks tied to this event, all of them will be called when triggered
         @@callbacks = [] of Callback
 
-        # Types of the arguments for the event
+        # Types of the arguments for the callback event
         ARG_TYPES = {
           \{% for arg in args %}
             \{{arg.var.stringify}} => \{{(arg.type.is_a? Self) ? @type : arg.type}},
@@ -62,11 +68,12 @@ module MiniEvents
           @@callbacks << Callback.new(&block)
         end
 
-        # Adds the block to the callbacks
+        # Adds the named block to the callbacks
         def self.add_callback(name : String, &block : CallbackProc)
           @@callbacks << \{{event_name}}::Callback.new(name, &block)
         end
 
+        # Removes a named block
         def self.remove_callback(name : String)
           @@callbacks.reject!(&.name.==(name))
         end
@@ -76,6 +83,7 @@ module MiniEvents
           @@callbacks.each(&.call(\{{args.map {|a| a.var}.splat}}))
         end
 
+        # Clears all the callbacks
         def self.clear_callbacks
           @@callbacks.clear
         end
@@ -114,7 +122,9 @@ module MiniEvents
       \{{event_name}}.trigger(\{{args.splat}})
     end
 
+    # Attaches this event to the class its run under
     macro _attach_self(event_name)
+      #TODO: Do check to make sure @type isnt a struct
       \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
         class \{{event_name}} < {{base_event_name}}
           # Triggers all the callbacks
@@ -128,23 +138,33 @@ module MiniEvents
 
         alias \{{event_name}}::SelfCallbackProc = Proc(\{% if args.size > 1 %}\{{args.values[1..].splat}}, \{% end %}Nil)
 
-        struct \{{event_name}}::Callback
+        struct \{{event_name}}::SelfCallback
+          # name of the proc
+          getter name : String = ""
+          # THe proc itself
+          getter proc : SelfCallbackProc
+          # TODO: Use this
+          # Should we only run this once?
+          getter? once = false
+
           def initialize(&block : SelfCallbackProc)
-            wrapped_block = \{{event_name}}::CallbackProc.new do |_\{% if args.size > 1 %},\{% end %} \{{args.keys[1..].map(&.id).splat}}|
-              block.call(\{{args.keys[1..].map(&.id).splat}})
-            end
-            @proc = wrapped_block
+            @proc = block
+          end
+
+          # Calls our proc with the arguments
+          def call(\{{args.keys[1..].map {|a| a.id}.splat}})
+            @proc.call(\{{args.keys[1..].map {|a| a.id}.splat}})
           end
         end
 
-        @%callbacks_\{{event_name.id.underscore}} = [] of \{{event_name}}::Callback
+        @%callbacks_\{{event_name.id.underscore}} = [] of \{{event_name}}::SelfCallback
 
         def on_\{{event_name.names.last.underscore}}(&block : \{{event_name}}::SelfCallbackProc)
-          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::Callback.new(&block)
+          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::SelfCallback.new(&block)
         end
 
         def on_\{{event_name.names.last.underscore}}(name : String, &block : \{{event_name}}::SelfCallbackProc)
-          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::Callback.new(name, &block)
+          @%callbacks_\{{event_name.id.underscore}} << \{{event_name}}::SelfCallback.new(name, &block)
         end
 
         def delete_\{{event_name.names.last.underscore}}(name : String)
@@ -159,7 +179,7 @@ module MiniEvents
         \{% args.each { |k,v| arg_types << "#{k.id} : #{v}".id }%}
 
         def run_\{{event_name.names.last.underscore}}(\{{arg_types[1..].splat}})
-          @%callbacks_\{{event_name.id.underscore}}.each(&.call(self\{% if args.size > 1 %},\{% end %}\{{args.keys[1..].map {|a| a.id }.splat}}))
+          @%callbacks_\{{event_name.id.underscore}}.each(&.call(\{{args.keys[1..].map {|a| a.id }.splat}}))
         end
       \{% end %}
     end

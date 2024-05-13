@@ -21,21 +21,21 @@ on(MyTest::MyEvent) do |test|
 end
 t.test
 
-# class MyTest2
-#   event MyEvent, x : self, i : Int32
+class MyTest2
+  event MyEvent, x : self, i : Int32
 
-#   def test
-#     emit MyEvent, self, 10
-#   end
-# end
+  def test
+    emit MyEvent, self, 10
+  end
+end
 
-# success2 = false
+success2 = false
 
-# t = MyTest2.new
-# on(MyTest2::MyEvent) do |test, i|
-#   success2 = true if i == 10
-# end
-# t.test
+t = MyTest2.new
+on(MyTest2::MyEvent) do |test, i|
+  success2 = true if i == 10
+end
+t.test
 
 if success1 && success2
   puts SUCCESS
