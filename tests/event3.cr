@@ -37,7 +37,23 @@ on(MyTest2::MyEvent, name: "mytest2") do |test, i|
 end
 t.test
 
-if success1 && success2
+struct MyTest3
+  single_event MyEvent, x : self, i : Int32
+
+  def test
+    emit MyEvent, self, 10
+  end
+end
+
+success3 = false
+
+test3 = MyTest3.new
+test3.on_my_event do
+  success3 = true
+end
+test3.test
+
+if success1 && success2 && success3
   puts SUCCESS
 else
   puts FAILURE

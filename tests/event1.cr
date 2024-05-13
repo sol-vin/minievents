@@ -30,6 +30,9 @@ on(::MyEvent4) { |i, j| success4 = true if i == 10 && j > 3}
 
 emit ::MyEvent4, 10, 3.4
 
+single_event ::MyEvent5, i : Int32
+on(::MyEvent5) { |i| puts "I Work! #{i}" }
+emit ::MyEvent5, 500
 
 if success1 && success2 && success3 && success4
   puts SUCCESS

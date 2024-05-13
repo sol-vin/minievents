@@ -4,10 +4,14 @@ module MiniEvents
   macro install(base_event_name = ::MiniEvents::Event)
     # Base class for events. NOT TO BE INHERITED BY ANYTHING UNLESS YOU REALLY NEED TO, use the `event` macro instead. HERE BE DRAGONS!
     abstract class {{base_event_name}}
+      SINGLE = false
+
       def initialize
         raise "Event should never be initialized!"
       end
     end
+
+
 
     # Creates a new event, attempts to bind itself to instances of a class if it's first argument is a self
     macro event(event_name, *args)
@@ -18,12 +22,15 @@ module MiniEvents
       \{% end %}
     end
 
+
+
     # Creates a new event
     macro _event(event_name, *args)
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
 
       # Create our event class
       class \{{event_name}} < {{base_event_name}}
+        SINGLE = false
         # Alias for the callback.
         alias CallbackProc = Proc(\{{(args.map {|arg| (arg.type.is_a? Self) ? @type : arg.type }).splat}}\{% if args.size > 0 %}, \{% end %}Nil)
         
@@ -96,38 +103,73 @@ module MiniEvents
         end
       end
     end
+ 
+    # Creates a new event, attempts to bind itself to instances of a class if it's first argument is a self
+    macro single_event(event_name, *args)
+      _single_event(\{{event_name}}, \{{args.splat}})
 
-    # Defines a global event callback
-    macro on(event_name, once = false, &block)
+      \{% if args.size > 0 && args[0].type.is_a?(Self) %}
+        _attach_single_self(\{{event_name}})
+      \{% end %}
+    end
+
+    # Creates a new event
+    macro _single_event(event_name, *args)
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
 
-      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
-        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
-      \{% end %}
-      \{{event_name}}.add_callback(once: \{{once}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
-        \{{ block.body }}
-        nil
+      # Create our event class
+      class \{{event_name}} < {{base_event_name}}
+        SINGLE = false
+        # Alias for the callback.
+        alias CallbackProc = Proc(\{{(args.map {|arg| (arg.type.is_a? Self) ? @type : arg.type }).splat}}\{% if args.size > 0 %}, \{% end %}Nil)
+
+        @@once = false
+        # Callbacks tied to this event, all of them will be called when triggered
+        @@callback : CallbackProc? = nil
+
+        # Types of the arguments for the callback event
+        ARG_TYPES = {
+          \{% for arg in args %}
+            \{{arg.var.stringify}} => \{{(arg.type.is_a? Self) ? @type : arg.type}},
+          \{% end %}
+        } of String => Object.class
+
+        # Adds the block to the callbacks
+        def self.add_callback(once = false, &block : CallbackProc)
+          @@once = once
+          @@callback = CallbackProc.new do \{% if args.size > 0 %}|\{{args.map { |a| a.var }.splat}}|\{% end %}
+            block.call(\{{args.map { |a| a.var }.splat}})
+
+            if once
+              @@callback = nil
+            end
+          end
+        end
+
+        # TODO: Fix this
+        # This is for compatability, i could probably fix this
+        def self.add_callback(name : String, once = false, &block : CallbackProc)
+          self.add_callback(once, &block)
+        end
+
+        # Removes a named block
+        def self.remove_callback()
+          @@callback = nil
+        end
+
+        # TODO: Fix this
+        # This is for compatability, i could probably fix this
+        def self.remove_callback(name : String)
+          @@callback = nil
+        end
+
+        # Triggers all the callbacks
+        def self.trigger(\{{args.map {|a| a.var}.splat}}) : Nil
+          @@callback.not_nil!.call(\{{args.map {|a| a.var}.splat}}) if @@callback
+        end
       end
     end
 
-    # Defines a global event named callback
-    macro on(event_name, name, once = false, &block)
-      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
-
-      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
-        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
-      \{% end %}
-      \{% raise "name cannot be empty" if name.empty? %}
-      \{{event_name}}.add_callback(\{{name}}, once: \{{once}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
-        \{{ block.body }}
-        nil
-      end
-    end
-
-    # Emits a global event callback
-    macro emit(event_name, *args)
-      \{{event_name}}.trigger(\{{args.splat}})
-    end
 
     # Attaches this event to the class its run under
     macro _attach_self(event_name)
@@ -202,6 +244,85 @@ module MiniEvents
           @%callbacks_\{{event_name.id.underscore}}.each(&.call(\{{args.keys[1..].map {|a| a.id }.splat}}))
         end
       \{% end %}
+    end
+
+
+
+    # Attaches this event to the class its run under
+    macro _attach_single_self(event_name)
+      #TODO: Do check to make sure @type isnt a struct
+      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        class \{{event_name}} < {{base_event_name}}
+          alias SelfCallbackProc = Proc(\{% if args.size > 1 %}\{{args.values[1..].splat}}, \{% end %}Nil)
+
+          # Triggers all the callbacks
+          def self.trigger(\{{args.keys.map(&.id).splat}}) : Nil
+            \{{args.keys[0].id}}.run_\{{event_name.names.last.underscore}}(\{{args.keys[1..].map(&.id).splat}})
+
+            @@callback.not_nil!.call(\{{args.keys.map(&.id).splat}}) if @@callback
+          end
+        end
+
+        @%callback_\{{event_name.id.underscore}} : \{{event_name}}::SelfCallbackProc? = nil
+
+        def on_\{{event_name.names.last.underscore}}(once = false, &block : \{{event_name}}::SelfCallbackProc)
+          @%callback_\{{event_name.id.underscore}} = \{{event_name}}::SelfCallbackProc.new do \{% if args.size > 1 %}|\{{args.keys[1..].map { |a| a.id }.splat}}|\{% end %}
+            block.call(\{{args.keys[1..].map { |a| a.id }.splat}})
+
+            if once
+              @%callback_\{{event_name.id.underscore}} = nil
+            end
+          end
+        end
+
+        def on_\{{event_name.names.last.underscore}}(name : String, once = false, &block : \{{event_name}}::SelfCallbackProc)
+          on_\{{event_name.names.last.underscore}}(once, &block)
+        end
+
+        def remove_\{{event_name.names.last.underscore}}(name : String)
+          @%callback_\{{event_name.id.underscore}} = nil
+        end
+
+        \{% arg_types = [] of MacroId%}
+        \{% args.each { |k,v| arg_types << "#{k.id} : #{v}".id }%}
+
+        def run_\{{event_name.names.last.underscore}}(\{{arg_types[1..].splat}})
+          @%callback_\{{event_name.id.underscore}}.not_nil!.call(\{{args.keys[1..].map {|a| a.id }.splat}}) if @%callback_\{{event_name.id.underscore}}
+        end
+      \{% end %}
+    end
+
+    # Defines a global event callback
+    macro on(event_name, once = false, &block)
+      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
+
+      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
+      \{% end %}
+      \{{event_name}}.add_callback(once: \{{once}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+        \{{ block.body }}
+        nil
+      end
+    end
+
+
+    # Defines a global event named callback
+    macro on(event_name, name, once = false, &block)
+      \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
+
+      \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
+        \{% raise "Incorrect arguments for block" unless block.args.size == args.size %}
+      \{% end %}
+      \{% raise "name cannot be empty" if name.empty? %}
+      \{{event_name}}.add_callback(\{{name}}, once: \{{once}}) do \{% if block.args.size > 0 %}|\{{block.args.splat}}|\{% end %}
+        \{{ block.body }}
+        nil
+      end
+    end
+
+    # Emits a global event callback
+    macro emit(event_name, *args)
+      \{{event_name}}.trigger(\{{args.splat}})
     end
   end
 end
