@@ -104,7 +104,7 @@ module MiniEvents
     end
 
     # Defines a global event named callback
-    macro on(name, event_name, &block)
+    macro on(event_name, name, &block)
       \{% raise "event_name should be a Path" unless event_name.is_a? Path %}
 
       \{% if args = parse_type("#{event_name}::ARG_TYPES").resolve? %}
@@ -147,9 +147,16 @@ module MiniEvents
           # Should we only run this once?
           getter? once = false
 
-          def initialize(&block : SelfCallbackProc)
+          def initialize(name : String? = nil, @once = false, &block : SelfCallbackProc)
+            if n = name
+              @name = n 
+            else
+              @name = UUID.random.to_s
+            end
+            
             @proc = block
           end
+          
 
           # Calls our proc with the arguments
           def call(\{{args.keys[1..].map {|a| a.id}.splat}})

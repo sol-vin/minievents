@@ -12,7 +12,7 @@ class MyTest
 end
 
 t = MyTest.new
-t.on_my_event do
+t.on_my_event(name: "mytest") do
   success1 = true
 end
 
@@ -32,7 +32,7 @@ end
 success2 = false
 
 t = MyTest2.new
-on(MyTest2::MyEvent) do |test, i|
+on(MyTest2::MyEvent, name: "mytest2") do |test, i|
   success2 = true if i == 10
 end
 t.test
